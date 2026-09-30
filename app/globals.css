@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+:root {
+  --studio: #1b1b1d;
+  --panel: #262629;
+  --panel-2: #313136;
+  --lane: #202023;
+  --line: #3a3a40;
+  --fg: #ececef;
+  --muted: #9a9aa3;
+  --inst: #5cc26b;
+  --audio: #4a9be0;
+  --drum: #e8b930;
+  --rec: #ef4b4b;
+  --lcd: #0e1116;
+}
+
+@theme inline {
+  --color-studio: var(--studio);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-lane: var(--lane);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-inst: var(--inst);
+  --color-audio: var(--audio);
+  --color-drum: var(--drum);
+  --color-rec: var(--rec);
+  --color-lcd: var(--lcd);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  background: var(--studio);
+  color: var(--fg);
+  overscroll-behavior: none;
+}
+
+.studio-range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.studio-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--fg) 0,
+    var(--fg) var(--fill, 50%),
+    #4a4a52 var(--fill, 50%),
+    #4a4a52 100%
+  );
+}
+.studio-range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: #4a4a52;
+}
+.studio-range::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--fg);
+}
+.studio-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 999px;
+  background: #f4f4f6;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
+}
+.studio-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 999px;
+  background: #f4f4f6;
+}
+
+.studio-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.studio-scroll::-webkit-scrollbar-thumb {
+  background: #45454c;
+  border-radius: 999px;
+  border: 2px solid var(--lane);
+}
+.studio-scroll::-webkit-scrollbar-corner,
+.studio-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
