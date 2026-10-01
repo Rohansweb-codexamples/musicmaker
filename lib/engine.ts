@@ -74,6 +74,7 @@ class Engine {
   private liveChannel!: Tone.Channel
   private liveFilterNode!: Tone.Filter
   private liveWobble!: Tone.LFO
+  private liveCutoff!: Tone.Signal<"number">
   private liveVoices = new Map<PresetId, Voice>()
   private liveCells = new Map<string, { loopId: string; startStep: number; stopStep: number | null; col: number; row: number }>()
   private liveQueuedCells = new Map<string, { loopId: string; startStep: number; col: number; row: number }>()
@@ -133,10 +134,10 @@ class Engine {
     this.liveChannel = new Tone.Channel({ volume: 0 }).connect(this.masterIn)
     this.liveFilterNode = new Tone.Filter({ type: "lowpass", frequency: 20000, Q: 0.7 }).connect(this.liveChannel)
     this.liveWobble = new Tone.LFO({ frequency: 4, min: -5000, max: 5000, type: "sine" })
-    // Prevent connectSignal from resetting the filter frequency to 0 when the LFO
-    // is connected. With override=true (the default), Tone.js zeroes the frequency
-    // Signal and marks it overridden, which causes rampTo to fail in sync().
-    ;(this.liveFilterNode.frequency as unknown as { override: boolean }).override = false
+    // Connecting a signal to filter.frequency overrides it (Tone zeroes it and ramps break),
+    // so the base cutoff is its own signal; cutoff + LFO sum at the filter's frequency param.
+    this.liveCutoff = new Tone.Signal({ value: 20000, units: "number" })
+    this.liveCutoff.connect(this.liveFilterNode.frequency)
     this.liveWobble.connect(this.liveFilterNode.frequency)
     this.liveWobble.amplitude.value = 0
 
@@ -191,9 +192,7 @@ class Engine {
     }
 
     if (this.liveFilterNode) {
-      if (!s.liveWobble.on) {
-        this.liveFilterNode.frequency.rampTo(80 * Math.pow(250, s.liveFilter.cutoff), 0.05)
-      }
+      this.liveCutoff.rampTo(80 * Math.pow(250, s.liveFilter.cutoff), 0.05)
       this.liveFilterNode.Q.rampTo(0.7 + s.liveFilter.resonance * 14, 0.05)
     }
     if (this.liveWobble) {
