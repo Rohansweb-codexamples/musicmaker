@@ -133,6 +133,10 @@ class Engine {
     this.liveChannel = new Tone.Channel({ volume: 0 }).connect(this.masterIn)
     this.liveFilterNode = new Tone.Filter({ type: "lowpass", frequency: 20000, Q: 0.7 }).connect(this.liveChannel)
     this.liveWobble = new Tone.LFO({ frequency: 4, min: -5000, max: 5000, type: "sine" })
+    // Prevent connectSignal from resetting the filter frequency to 0 when the LFO
+    // is connected. With override=true (the default), Tone.js zeroes the frequency
+    // Signal and marks it overridden, which causes rampTo to fail in sync().
+    ;(this.liveFilterNode.frequency as unknown as { override: boolean }).override = false
     this.liveWobble.connect(this.liveFilterNode.frequency)
     this.liveWobble.amplitude.value = 0
 
