@@ -71,6 +71,13 @@ class Engine {
   private previewVoices = new Map<PresetId, Voice>()
   private liveHeld = new Map<number, Voice>()
 
+  private liveChannel!: Tone.Channel
+  private liveFilterNode!: Tone.Filter
+  private liveWobble!: Tone.LFO
+  private liveVoices = new Map<PresetId, Voice>()
+  private liveCells = new Map<string, { loopId: string; startStep: number; stopStep: number | null; col: number; row: number }>()
+  private liveQueuedCells = new Map<string, { loopId: string; startStep: number; col: number; row: number }>()
+
   private masterIn!: Tone.Gain
   private masterVol!: Tone.Volume
   private musicBus!: Tone.Gain
@@ -123,6 +130,12 @@ class Engine {
     }).connect(this.masterVol)
     this.click.volume.value = -14
 
+    this.liveChannel = new Tone.Channel({ volume: 0 }).connect(this.masterIn)
+    this.liveFilterNode = new Tone.Filter({ type: "lowpass", frequency: 20000, Q: 0.7 }).connect(this.liveChannel)
+    this.liveWobble = new Tone.LFO({ frequency: 4, min: -5000, max: 5000, type: "sine" })
+    this.liveWobble.connect(this.liveFilterNode.frequency)
+    this.liveWobble.amplitude.value = 0
+
     const tr = this.transport
     tr.bpm.value = store.get().bpm
     tr.scheduleRepeat((time) => this.tick(time), "16n", 0)
@@ -171,6 +184,22 @@ class Engine {
       if (regionIds.has(id)) continue
       p.dispose()
       this.players.delete(id)
+    }
+
+    if (this.liveFilterNode) {
+      if (!s.liveWobble.on) {
+        this.liveFilterNode.frequency.rampTo(80 * Math.pow(250, s.liveFilter.cutoff), 0.05)
+      }
+      this.liveFilterNode.Q.rampTo(0.7 + s.liveFilter.resonance * 14, 0.05)
+    }
+    if (this.liveWobble) {
+      if (s.liveWobble.on) {
+        this.liveWobble.amplitude.rampTo(1, 0.1)
+        if (this.liveWobble.state !== "started") this.liveWobble.start()
+        this.liveWobble.frequency.rampTo(s.liveWobble.rate, 0.05)
+      } else {
+        this.liveWobble.amplitude.rampTo(0, 0.1)
+      }
     }
   }
 
@@ -227,6 +256,11 @@ class Engine {
       return
     }
     if (this.mode !== "play") return
+
+    if (s.view === "live") {
+      this.tickLive(step, time, stepSec)
+      return
+    }
 
     if (step < this.lastStep) {
       this.players.forEach((p) => p.state === "started" && p.stop(time))
@@ -344,6 +378,9 @@ class Engine {
     })
     if (recording) await this.finishRecording()
     if (store.get().previewId) this.startPreviewTransport()
+    this.liveCells.clear()
+    this.liveQueuedCells.clear()
+    store.set({ livePlaying: {}, liveQueued: [] })
   }
 
   setPlayhead(bar: number) {
@@ -355,6 +392,10 @@ class Engine {
       this.resync = true
       this.lastStep = -1
       tr.ticks = Math.round(b * tr.PPQ * 4)
+      if (store.get().view === "live") {
+        const stepBase = Math.round(b * 16)
+        for (const [, cell] of this.liveCells) cell.startStep = stepBase
+      }
     }
   }
 
@@ -387,6 +428,126 @@ class Engine {
       this.transport.stop()
       this.mode = "idle"
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Live Loops grid
+  // -------------------------------------------------------------------------
+
+  private liveVoice(preset: PresetId): Voice {
+    let v = this.liveVoices.get(preset)
+    if (!v) {
+      v = createVoice(preset)
+      v.output.connect(this.liveFilterNode)
+      this.liveVoices.set(preset, v)
+    }
+    return v
+  }
+
+  private tickLive(step: number, time: number, stepSec: number) {
+    for (const [key, q] of this.liveQueuedCells) {
+      if (step >= q.startStep) {
+        this.liveCells.set(key, {
+          loopId: q.loopId,
+          startStep: q.startStep,
+          stopStep: null,
+          col: q.col,
+          row: q.row,
+        })
+        this.liveQueuedCells.delete(key)
+        this.syncLiveStore()
+      }
+    }
+
+    for (const [key, cell] of this.liveCells) {
+      if (cell.stopStep !== null && step >= cell.stopStep) {
+        this.liveCells.delete(key)
+        this.syncLiveStore()
+        continue
+      }
+      const loop = LOOP_BY_ID.get(cell.loopId)
+      if (!loop) continue
+      const totalSteps = loop.bars * 16
+      const localStep = (((step - cell.startStep) % totalSteps) + totalSteps) % totalSteps
+      const events = indexByStep(getLoopNotes(cell.loopId)).get(localStep)
+      if (!events) continue
+      const voice = this.liveVoice(loop.preset)
+      for (const ev of events) voice.play(ev, time, stepSec)
+    }
+  }
+
+  async toggleLiveCell(key: string, loopId: string, col: number, row: number) {
+    await this.ensure()
+    if (this.mode === "idle") {
+      await this.play()
+    } else if (this.mode === "preview") {
+      this.stopPreview()
+      await this.play()
+    }
+
+    const tr = this.transport
+    const currentBar = Math.floor(tr.ticks / (tr.PPQ * 4))
+    const nextBarStep = (currentBar + 1) * 16
+
+    if (this.liveCells.has(key)) {
+      const cell = this.liveCells.get(key)!
+      if (cell.stopStep === null) cell.stopStep = nextBarStep
+    } else if (this.liveQueuedCells.has(key)) {
+      this.liveQueuedCells.delete(key)
+    } else {
+      this.liveQueuedCells.set(key, { loopId, startStep: nextBarStep, col, row })
+    }
+    this.syncLiveStore()
+  }
+
+  async playLiveColumn(col: number) {
+    await this.ensure()
+    if (this.mode === "idle") await this.play()
+    else if (this.mode === "preview") {
+      this.stopPreview()
+      await this.play()
+    }
+
+    const s = store.get()
+    const tr = this.transport
+    const currentBar = Math.floor(tr.ticks / (tr.PPQ * 4))
+    const nextBarStep = (currentBar + 1) * 16
+
+    for (const [, cell] of this.liveCells) cell.stopStep = nextBarStep
+    this.liveQueuedCells.clear()
+
+    for (let row = 0; row < s.grid.length; row++) {
+      const loopId = s.grid[row][col]
+      if (loopId) {
+        const key = `${col}-${row}`
+        this.liveQueuedCells.set(key, { loopId, startStep: nextBarStep, col, row })
+      }
+    }
+    this.syncLiveStore()
+  }
+
+  stopAllLiveCells() {
+    const tr = this.transport
+    const currentBar = Math.floor(tr.ticks / (tr.PPQ * 4))
+    const nextBarStep = (currentBar + 1) * 16
+    for (const [, cell] of this.liveCells) cell.stopStep = nextBarStep
+    this.liveQueuedCells.clear()
+    this.syncLiveStore()
+  }
+
+  triggerLiveFx(type: number) {
+    this.ensure().then(() => {
+      const voice = this.liveVoice("fx")
+      voice.noteOn(type, 0.8)
+    })
+  }
+
+  private syncLiveStore() {
+    const playing: Record<string, number> = {}
+    for (const [key, cell] of this.liveCells) {
+      if (cell.stopStep === null) playing[key] = cell.startStep
+    }
+    store.set({ livePlaying: playing, liveQueued: Array.from(this.liveQueuedCells.keys()) })
   }
 
   // -------------------------------------------------------------------------
