@@ -640,7 +640,7 @@ function simpleDrumStyle(
   }
 }
 
-const DRUM_STYLES: StyleDef[] = [
+export const DRUM_STYLES: StyleDef[] = [
   beatStyle("beat-deep-groove", "Deep Groove Beat", "kit-deep", "Deep House", ["Relaxed", "Groovy"], {
     kicks: KICKS.four, hats: [0, 3, 5], ohh: 0.5, shaker: 0.7, perc: 0.3, ride: 0.1, rim: 0.4,
   }),
@@ -674,22 +674,22 @@ const DRUM_STYLES: StyleDef[] = [
   simpleDrumStyle("kick-garage", "2-Step Kick", "kick", "kit-house", "UK Garage", ["Groovy"], 10, () => [
     [KICKS.garage, DRUM.kick, 1],
   ]),
-  simpleDrumStyle("hats-offbeat", "Offbeat Hats", "hats", "Classic House", ["Groovy", "Clean"], 16, (v) => [
+  simpleDrumStyle("hats-offbeat", "Offbeat Hats", "hats", "kit-house", "Classic House", ["Groovy", "Clean"], 16, (v) => [
     [OHH, DRUM.ohh, 0.7],
     ...(v % 2 ? [[CHH.slice(1, 3), DRUM.chh, 0.5] as [string[], number, number]] : []),
   ]),
-  simpleDrumStyle("hats-shuffle", "Shuffle Hats", "hats", "UK Garage", ["Groovy"], 16, () => [
+  simpleDrumStyle("hats-shuffle", "Shuffle Hats", "hats", "kit-house", "UK Garage", ["Groovy"], 16, () => [
     [[CHH[4], CHH[5], CHH[3]], DRUM.chh, 0.75],
   ]),
-  simpleDrumStyle("hats-sixteenth", "16th Hats", "hats", "Tech House", ["Intense"], 16, (v) => [
+  simpleDrumStyle("hats-sixteenth", "16th Hats", "hats", "kit-house", "Tech House", ["Intense"], 16, (v) => [
     [[CHH[2], CHH[5]], DRUM.chh, 0.7],
     ...(v % 3 === 0 ? [[OHH, DRUM.ohh, 0.55] as [string[], number, number]] : []),
   ]),
-  simpleDrumStyle("hats-open", "Open Hat Groove", "hats", "Deep House", ["Relaxed", "Groovy"], 16, () => [
+  simpleDrumStyle("hats-open", "Open Hat Groove", "hats", "kit-deep", "Deep House", ["Relaxed", "Groovy"], 16, () => [
     [OHH, DRUM.ohh, 0.65],
     [[CHH[0], CHH[3]], DRUM.chh, 0.45],
   ]),
-  simpleDrumStyle("hats-ride", "Ride Groove", "hats", "Progressive", ["Intense"], 16, () => [[RIDE, DRUM.ride, 0.55]]),
+  simpleDrumStyle("hats-ride", "Ride Groove", "hats", "kit-house", "Progressive", ["Intense"], 16, () => [[RIDE, DRUM.ride, 0.55]]),
   simpleDrumStyle("perc-conga", "Conga Groove", "percussion", "kit-deep", "Afro House", ["Groovy", "Relaxed"], 16, () => [
     [PERC, DRUM.congaMid, 0.7],
     [[PERC[2], PERC[3]], DRUM.congaHigh, 0.6],
