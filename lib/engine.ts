@@ -114,7 +114,7 @@ class Engine {
   private async init() {
     await Tone.start()
     const ctx = Tone.getContext()
-    ctx.lookAhead = 0.06
+    ctx.lookAhead = 0.1
 
     this.masterVol = new Tone.Volume(0).toDestination()
     const limiter = new Tone.Limiter(-1).connect(this.masterVol)
@@ -475,8 +475,19 @@ class Engine {
       const events = indexByStep(getLoopNotes(cell.loopId)).get(localStep)
       if (!events) continue
       const voice = this.liveVoice(loop.preset)
-      for (const ev of events) voice.play(ev, time, stepSec)
+      // One failing note must not drop the other cells' notes (or the rest of this tick).
+      try {
+        for (const ev of events) voice.play(ev, time, stepSec)
+      } catch (e) {
+        console.warn("[live] note skipped", e)
+      }
     }
+  }
+
+  /** Build a loop's voice when it is queued (a bar ahead) instead of inside the audio-timing callback. */
+  private warmLiveVoice(loopId: string) {
+    const loop = LOOP_BY_ID.get(loopId)
+    if (loop) this.liveVoice(loop.preset)
   }
 
   async toggleLiveCell(key: string, loopId: string, col: number, row: number) {
@@ -498,6 +509,7 @@ class Engine {
     } else if (this.liveQueuedCells.has(key)) {
       this.liveQueuedCells.delete(key)
     } else {
+      this.warmLiveVoice(loopId)
       this.liveQueuedCells.set(key, { loopId, startStep: nextBarStep, col, row })
     }
     this.syncLiveStore()
@@ -523,6 +535,7 @@ class Engine {
       const loopId = s.grid[row][col]
       if (loopId) {
         const key = `${col}-${row}`
+        this.warmLiveVoice(loopId)
         this.liveQueuedCells.set(key, { loopId, startStep: nextBarStep, col, row })
       }
     }
