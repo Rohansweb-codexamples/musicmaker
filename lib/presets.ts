@@ -12,11 +12,16 @@ export interface Voice {
 
 const hz = (midi: number) => Tone.Frequency(midi, "midi").toFrequency()
 
-/** Tone sources throw if restarted at an identical time; nudge forward when needed. */
+/**
+ * Tone sources throw if restarted at an identical time, and they clamp past times to "now".
+ * If the main thread stalls, several close hits would all clamp to the same instant and throw,
+ * so clamp to the audio clock ourselves first (with a small margin), then nudge forward when needed.
+ */
 function monotonic() {
   let last = 0
   return (t: number) => {
-    const next = t <= last ? last + 0.0005 : t
+    const base = Math.max(t, Tone.getContext().currentTime + 0.005)
+    const next = base <= last + 0.0001 ? last + 0.0005 : base
     last = next
     return next
   }

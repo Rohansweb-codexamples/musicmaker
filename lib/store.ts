@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react"
 import type { PresetId } from "./instruments"
 import { isDrumPreset } from "./instruments"
-import { LOOP_BY_ID, loopId, type NoteEvent } from "./loops"
+import { LOOP_BY_ID, LOOPS, loopId, type Category, type NoteEvent } from "./loops"
 import type { Mode } from "./music"
 
 export type TrackKind = "drums" | "instrument" | "audio"
@@ -67,10 +67,42 @@ export interface StudioState {
   exporting: null | { progress: number }
   micError: string | null
   heldNotes: number[]
+  view: "live" | "tracks"
+  grid: string[][]
+  livePlaying: Record<string, number>
+  liveQueued: string[]
+  liveFilter: { cutoff: number; resonance: number }
+  liveWobble: { on: boolean; rate: number }
 }
 
 let uid = 0
 export const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${(uid++).toString(36)}`
+
+export const GRID_ROWS = 4
+export const GRID_COLS = 9
+
+const GRID_INIT: string[][] = [
+  ["beat-deep-groove.x.0", "beat-tech-drive.x.2", "beat-classic-909.x.1", "beat-garage-shuffle.x.0", "beat-disco.x.0", "beat-afro-groove.x.3", "beat-big-room.x.0", "beat-minimal-tick.x.5", "hats-offbeat.x.1"],
+  ["bass-deep-night.9.0", "bass-rolling-sub.9.3", "bass-acid-pulse.9.1", "bass-organ-groove.9.0", "bass-reese-low.9.2", "bass-disco-octave.9.0", "bass-garage-wobble.9.4", "bass-funky-slap.9.2", "kick-four.x.0"],
+  ["keys-house-piano.9.0", "keys-organ-stab.9.0", "keys-deep-rhodes.9.0", "keys-saw-stab.9.0", "keys-soul-keys.9.0", "synth-pluck-arp.9.0", "synth-night-arp.9.0", "synth-bell-hook.9.0", "synth-lead-riff.9.0"],
+  ["pad-warm.9.0", "pad-air.9.0", "pad-dark.9.0", "vox-chop.9.0", "vox-ooh-choir.9.0", "vox-ee-stabs.9.0", "synth-chime-groove.9.0", "fx-noise-riser.x.0", "fx-tonal-riser.x.0"],
+]
+
+function randomGrid(root: number): string[][] {
+  const rowCats: Category[][] = [
+    ["beats", "kick", "hats", "percussion"],
+    ["bass"],
+    ["keys", "synth"],
+    ["pads", "vocals", "fx"],
+  ]
+  return rowCats.map((cats) => {
+    const pool = LOOPS.filter((l) => cats.includes(l.category) && (l.root === null || l.root === root))
+    return Array.from({ length: GRID_COLS }, () => {
+      const loop = pool[Math.floor(Math.random() * pool.length)]
+      return loop?.id ?? ""
+    })
+  })
+}
 
 export function kindForPreset(preset: PresetId): TrackKind {
   return isDrumPreset(preset) ? "drums" : "instrument"
@@ -157,6 +189,12 @@ let state: StudioState = {
   exporting: null,
   micError: null,
   heldNotes: [],
+  view: "live",
+  grid: GRID_INIT,
+  livePlaying: {},
+  liveQueued: [],
+  liveFilter: { cutoff: 1, resonance: 0 },
+  liveWobble: { on: false, rate: 4 },
 }
 
 const listeners = new Set<() => void>()
@@ -241,6 +279,19 @@ export const actions = {
   },
   select(trackId: string | null, regionId: string | null = null) {
     store.set({ selectedTrackId: trackId, selectedRegionId: regionId })
+  },
+  setView(view: "live" | "tracks") {
+    store.set({ view })
+  },
+  shuffleGrid() {
+    const s = store.get()
+    store.set({ grid: randomGrid(s.keyRoot) })
+  },
+  setLiveFilter(cutoff: number, resonance: number) {
+    store.set((s) => ({ liveFilter: { cutoff, resonance } }))
+  },
+  setLiveWobble(on: boolean, rate: number) {
+    store.set((s) => ({ liveWobble: { on, rate } }))
   },
 }
 

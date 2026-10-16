@@ -13,6 +13,7 @@
   --drum: #e8b930;
   --rec: #ef4b4b;
   --lcd: #0e1116;
+  --purple: #8a2be2;
 }
 
 @theme inline {
@@ -28,6 +29,7 @@
   --color-drum: var(--drum);
   --color-rec: var(--rec);
   --color-lcd: var(--lcd);
+  --color-purple: var(--purple);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
