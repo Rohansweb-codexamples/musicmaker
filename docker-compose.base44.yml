@@ -10,6 +10,7 @@ services:
       - /app/node_modules
       - /app/.next
     environment:
+      - BASE44_PREVIEW_MODE
       - BASE44_PUBLIC_HOST_SUFFIX=${BASE44_PUBLIC_HOST_SUFFIX}
       - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=${BASE44_PUBLIC_HOST_SUFFIX}
     command: ["sh", "-ec", "npm ci --no-audit --no-fund && exec npx next dev -p 3000 -H 0.0.0.0"]
